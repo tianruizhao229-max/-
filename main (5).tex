@@ -1,0 +1,970 @@
+%% 美赛模板：正文部分
+
+\documentclass[12pt]{article}  % 官方要求字号不小于 12 号，此处选择 12 号字体
+
+% 本模板不需要填写年份，以当前电脑时间自动生成
+% 请在以下的方括号中填写队伍控制号
+\usepackage[2615667]{easymcm}  % 载入 EasyMCM 模板文件.
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{pythonhighlight}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{threeparttable}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{apacite} % APA (BibTeX) citations
+\problem{A}  % 请在此处填写题号
+\usepackage{mathptmx}  % 这是 Times 字体，中规中矩 
+%\usepackage{mathpazo}  % 这是 COMAP 官方杂志采用的更好看的 Palatino 字体，可替代以上的 mathptmx 宏包
+\setlength{\emergencystretch}{2em} % 缓解轻微 Overfull \\hbox
+
+
+\title{TITLE}  % 标题
+
+% 如需要修改题头（默认为 MCM/ICM），请使用以下命令（此处修改为 MCM）
+\renewcommand{\contest}{MCM}
+\newenvironment{shrinkeq}[1]
+{ \bgroup
+	\addtolength\abovedisplayshortskip{#1}
+	\addtolength\abovedisplayskip{#1}
+	\addtolength\belowdisplayshortskip{#1}
+	\addtolength\belowdisplayskip{#1}}
+{\egroup\ignorespacesafterend}
+% 文档开始
+\begin{document}
+Smartphone battery life is influenced by multiple factors including the display, processor, network, background applications, environmental conditions, and battery degradation. A continuous-time mathematical model must be established to describe the state of charge (SOC) over time and predict discharge duration under various usage scenarios. Below are our responses to the four tasks:\par
+\textsc{Task1}: This study achieves high-fidelity prediction of smartphone battery endurance by constructing a physics-based white-box continuous-time dynamics framework. The model decouples the system into electrochemical, Thevenin circuit, thermodynamic, and multi-component load state machine components. Driven by the state vector $\mathbf{y}(t)=[\xi(t), V_{rc}(t), \Theta(t), \mathcal{F}(t)]^\top$, it reveals the physical mechanism of "voltage drop-current surge-accelerated power loss" during low-charge states. To address the multi-timescale characteristics spanning seconds to hours, the LSODA algorithm is employed for efficient solution. Simulation results indicate endurance time $T_{empty}$ ranges from 8.27 to 17.05 hours, providing theoretically grounded insights with strong generalization capabilities and deep physical interpretability for smartphone energy efficiency optimization, thermal management, and battery health assessment.\par
+\textsc{Task 2}: We simulated the established model and calculated the Time To Empty (TTE) under different initial SOCs and usage patterns, obtaining a series of images. Analysis revealed a strong linear relationship between TTE and SOC, consistent with everyday observations. However, the duration per 1\% SOC varies, also indicating a nonlinear relationship between TTE and SOC. Lower SOC levels deplete faster, explaining why batteries become less durable as charge levels decrease. Analysis indicates that coulombic efficiency and nominal battery capacity are the primary factors shortening battery life, while the impact of equivalent capacitance and polarization resistance on the model was unexpectedly minor.\par
+\textsc{Task 3}: Based on standardized regression coefficients, parameter sensitivity analysis reveals that battery nominal capacity has the greatest impact on TTE, accounting for 73.0\%. In our model assumptions, through relaxation analysis, we identified the least reasonable assumption as the constant user usage pattern (A2), with an impact measure of 8.34\% and an effectiveness of 0.062. Finally, Monte Carlo simulation yielded a 95\% confidence interval of [9.11, 10.97] hours. We conclude that our model is capacity-dominant.\par
+\textsc{Task4}: Based on the electrothermal coupling model constructed earlier, we propose executable optimization strategies for both users and operating systems, while validating the model's generalization capability: On the user side, we recommend prioritizing WiFi networks over 5G to reduce communication power consumption by approximately 66\%, avoiding unnecessary 100\% screen brightness, and terminating high-load tasks like gaming during low battery conditions; At the operating system level, we propose preemptive current clipping and remaining runtime interval display mechanisms to optimize energy allocation. Furthermore, due to the universal nature of the model's core electrochemical kinetic equations, cross-device transfer is achievable with only minor adaptations to target device load characteristics and thermal boundary conditions, fully demonstrating the model's generalization capability.\par
+Finally, we analyzed the strengths and weaknesses of the model.Unlike data-driven approaches, our "white-box" model clearly elucidates the power depletion mechanism with high computational efficiency and robustness. However, deviations may arise from the simplification of stochastic user behaviors and internal thermodynamic sources.
+
+
+
+% 此处填写摘要内容
+\begin{abstract}
+
+
+    % 美赛论文中无需注明关键字。若您一定要使用，
+    % 请将以下两行的注释号 '%' 去除，以使其生效
+     \noindent\textbf{Keywords}:Electrochemistry, nonlinear relationships, positive feedback, Thevenin circuits, Monte Carlo simulation, Markov chains.
+
+\end{abstract}
+
+\maketitle  % 生成 Summary Sheet
+\tableofcontents  % 生成目录
+
+
+% 正文开始
+\section{Introduction}
+\subsection{Background of the Problem}
+Smartphones have become an indispensable part of modern life, supporting communication, work, entertainment, and travel. However, their battery endurance is often inconsistent. Even the same model may exhibit drastically different battery performance at different times. 
+
+\begin{wrapfigure}{l}{0.5\textwidth}
+	\includegraphics[width=0.51\textwidth]{battery.png}
+	\caption{battery}\label{fig:battery}
+\end{wrapfigure}
+ The discharge process of smartphone batteries is influenced by multiple factors: at the hardware level, fluctuating screen brightness, processor load, wireless modules, location services, and background applications cause power consumption variations; Environmental factors also impact battery performance. Furthermore, as charge-discharge cycles accumulate, battery capacity gradually degrades, further reducing usable runtime. These interacting factors result in highly dynamic and nonlinear battery life characteristics. This complexity poses significant challenges for accurately modeling and predicting battery performance.
+
+
+
+\subsection{Restatement of the Problem}
+This study focuses on lithium-ion batteries in smartphones. The goal is to develop a continuous-time, physically interpretable state-of-charge (SOC) model to predict the remaining battery life (Time-to-Empty) under various usage conditions. Based on this model, practical optimization strategies will be proposed. The problem can be broken down into the following four tasks.
+
+$\bullet$ \ For \textsc{Task 1}, we need to develop a continuous-time SOC differential equation model based on the principle of charge conservation. This model must incorporate key time-varying power consumption factors, such as screen usage, processor load, and network communication. Electrochemical correction terms for factors such as ambient temperature and battery aging also need to be included. This approach must clearly distinguish itself from simple discrete fitting methods or black-box prediction models.
+
+$\bullet$ \ For \textsc{Task 2}, we need to use the model to calculate the remaining battery life for different initial SOC levels, battery health states, and typical usage scenarios. These predictions must be compared with available validation data. The uncertainty in the prediction results needs to be quantified, and key factors affecting power consumption need to be identified.
+
+$\bullet$ \ For \textsc{Task 3}, we need to assess the validity of the model's assumptions and evaluate the sensitivity of key parameters. This analysis is necessary to determine the model's robustness and define its scope of applicability under various conditions.
+
+$\bullet$ \ For \textsc{Task 4},the findings from the model need to be translated into practical recommendations for users to optimize battery life. Additionally, dynamic power management strategies for operating systems need to be developed. Unlike existing studies that often focus on isolated factors, this study needs to emphasize a continuous-time, multi-factor coupling approach, which will provide a more comprehensive understanding of battery behavior.\par
+\textbf{Our model and parameter assumptions are approximated based on the actual test set~\cite{guegain2024androwatts} to facilitate model derivation and validation.}
+
+\subsection{Literature Review}
+We referenced multiple studies to support the modeling choices in this paper.
+
+For the screen brightness power law in Eq.~\eqref{eq:pd_brightness}, we simplified the reported exponent (2.2) to $\gamma=2.0$ to streamline the model while retaining the main nonlinear trend \cite{zhang2024oled}.
+
+For the low-SOC internal resistance rise and the resulting accelerated drain under constant-power loads, we referenced practical discussions on voltage/resistance dynamics \cite{cmbatteries2024understanding18650}.
+
+Regarding differential-equation-based battery modeling and hybrid (physics + ML) formulations, we referenced recent works on physics-informed and universal differential equation approaches \cite{dang2025fractionalpinn,tarushri2025universalde,tu2024integratingphysicsml}.
+
+For the definition/usage context of charge and OCV modeling, we referenced \cite{pillai2023ocvpart1}.
+
+For component-level smartphone power consumption data used for load-model parameterization, we referenced \cite{malik2013smartphonepower}.
+
+
+
+\subsection{Our Work}
+\textbf{Our work is primarily reflected in the diagram below:}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{Our_Work.pdf}
+\caption{Our work diagram}
+\label{fig:our_work}
+\end{figure}
+
+\section{Model Perpation}
+\subsection{Assumptions and Justifications}
+To simplify the problem and make it more relevant to real-world production and daily life, we have made the following assumptions and provided corresponding explanations:\par
+$\bullet$\textbf{Assumption 1:} The dynamic impedance characteristics of the battery can be adequately approximated by a first-order Thevenin equivalent circuit (comprising an ohmic internal resistance $R_0$ and an RC parallel network).\par
+\textbf{Justification:} A first-order RC network can capture the transient polarization response of a battery under load changes with low computational cost. A mobile phone battery (including internal resistance, protection board, and cell characteristics) is a two-terminal network containing sources. The Thevenin theorem allows it to be equivalent to a series circuit of an ideal voltage source and equivalent internal resistance. This approximates the complex nonlinear characteristics of the battery (over short time periods) as a linear model, significantly reducing the computational complexity of battery-load matching and power consumption analysis.\par
+$\bullet$\textbf{Assumption 2:} We assume the external ambient temperature remains constant throughout the entire discharge cycle ($\Theta_\infty=298.15\text{ K}$), disregarding diurnal temperature variations or disturbances from external heat sources.\par
+\textbf{Justification:} The time scale of a single discharge cycle typically spans several hours, during which the likelihood of significant environmental temperature fluctuations is low. This assumption aligns with standard laboratory testing conditions, facilitating the initial calibration of parameters.\par
+$\bullet$\textbf{Assumption 3:} We assume that under a specific single application scenario, the load power remains constant, disregarding random power fluctuations caused by user operations or dynamic switching between scenarios.\par
+\textbf{Justification:} Simplifying complex random user behavior and battery physics enables standardized endurance assessments for typical scenarios such as "video playback" and "gaming."\par
+$\bullet$\textbf{Assumption 5:} The maximum available capacity of the battery remains constant within a single discharge cycle (lasting several hours).\par
+\textbf{Justification:} Battery aging (capacity degradation) is a long-term physicochemical process (occurring over months or years), and its changes are negligible compared to a single discharge cycle. Therefore, it can be treated as a constant when calculating single-charge runtime.
+\subsection{Notations}
+\vspace{-1cm}
+\begin{table}[H]
+\centering
+\caption{Notations.}
+\label{tab:notations}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{p{0.18\linewidth}p{0.57\linewidth}p{0.18\linewidth}}
+\toprule
+\textbf{Notation} & \textbf{Definition} & \textbf{Unit} \\
+\midrule
+$\xi(t)$ & State of Charge (SOC) & - \\
+$V_{ocv}$ & Open Circuit Voltage & V \\
+$V_{term}$ & Terminal Voltage & V \\
+$V_{rc}$ & RC branch polarization voltage & V \\
+$I(t)$ & Discharge current & A \\
+$Q_n$ & Nominal capacity & Ah \\
+$Q_{max}$ & Current maximum available capacity & Ah \\
+$R_0$ & Ohmic resistance & $\Omega$ \\
+$R_1$ & Polarization resistance & $\Omega$ \\
+$C_1$ & Polarization capacitance & F \\
+$\Theta(t)$ & Battery real-time temperature & $^\circ\text{C}$ / K \\
+$\Theta_\infty$ & Ambient temperature & $^\circ\text{C}$ / K \\
+$c_p$ & Specific heat capacity of the battery & J/(kg\,\textperiodcentered\,K) \\
+$P_{tot}$ & Total power consumption of smartphones & W \\
+$T_{empty}$ & Time-to-Empty & s / h \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\section{\textsc{Task 1} : Continuous-Time Physics-Based Battery Model}
+\subsection{Methodological Overview}
+We develop a physics-based white-box framework that decouples the smartphone-battery system into three coupled modules: electrochemical kinetics, hermodynamic regulation, and operational load dynamics. Deviating from physically opaque black-box models, our approach employs a system of Ordinary Differential Equations (ODEs) to rigorously characterize the continuous-time evolution of the battery state. The system is governed by the state vector $\mathbf{y}(t)=[\xi(t), V_{rc}(t), \Theta(t), \mathcal{F}(t)]^\top$, which integrates a first-order Thevenin equivalent circuit for dynamic impedance, Arrhenius-based temperature sensitivity, and a semi-empirical law for capacity fade. By simulating the discharge trajectory $\xi(t)$ across diverse usage scenarios, the model provides a high-fidelity estimation of the Time-to-Empty ($T_{empty}$) relative to a critical $5\%$ cutoff threshold.
+\subsection{Electrochemical Fundamentals and Equivalent Circuit}
+
+\noindent$\blacktriangleright$\ \textbf{Nonlinear Open-Circuit Voltage (OCV) Modeling}
+In our continuous-time model, the open-circuit voltage (OCV), denoted as $V_{ocv}$, is a nonlinear function of the SOC ($\xi$). This relationship is derived from electrochemical thermodynamic principles-specifically the Nernst Equation-rather than simple empirical fitting.
+
+\begin{equation}\label{eq:ocv}
+V_{ocv}(\xi)=\underbrace{\alpha_0+\alpha_1\xi}_{\text{Equilibrium Region}}
++\underbrace{\alpha_2 e^{\beta_1(\xi-\xi_1)}}_{\text{Full-Charge Polarization}}
+-\underbrace{\alpha_3 e^{-\beta_2(\xi-\xi_2)}}_{\text{Depletion Diffusion Limit}}
+\end{equation}
+As shown in Eq.~\eqref{eq:ocv}, the OCV--SOC relationship can be interpreted as three physically motivated terms:
+\begin{enumerate}
+\item \textbf{Thermodynamic equilibrium plateau term}: $\alpha_0 + \alpha_1\xi$. This linear term dominates when $20\%\le \mathrm{SOC}\le 80\%$, indicating near-equilibrium lithium-ion intercalation/deintercalation; $\alpha_0$ is the reference potential and $\alpha_1$ measures the SOC sensitivity.
+\item \textbf{Full-charge polarization term}: $+\alpha_2\exp\!\left(\beta_1(\xi-\xi_1)\right)$. As $\xi\to 1$, this term produces an exponential voltage rise, capturing concentration polarization near saturation while avoiding numerical issues.
+\item \textbf{Depletion diffusion-limit term}: $-\alpha_3\exp\!\left(-\beta_2(\xi-\xi_2)\right)$. As $\xi\to 0$, this term models the rapid voltage drop caused by active-material depletion and diffusion limitation, consistent with the observed behavior near cutoff.
+\end{enumerate}
+\noindent$\blacktriangleright$ \textbf{Thevenin Equivalent Circuit Model}\par
+To capture transient voltage responses under load, we employ a Thevenin equivalent circuit comprising an ohmic resistance and a polarization network. Based on Kirchhoff's Voltage Law (KVL), the terminal voltage $V_{term}(t)$ is:
+
+
+\begin{equation}\label{eq:vterm}
+V_{term}(t)=V_{ocv}(\xi(t)) - I(t)R_0 - V_{rc}(t)
+\end{equation}
+where $I(t)$ is the discharge current, $R_0$ is the \textbf{Ohmic internal resistance}, and $V_{rc}$ represents the polarization voltage arising from concentration gradients and charge transfer. The evolution of $V_{rc}$ follows:
+
+
+\begin{equation}\label{eq:vrc}
+\tau \frac{dV_{rc}}{dt} + V_{rc} = I(t)R_1
+\end{equation}
+
+Here, $\tau = R_1 C_1$ is the relaxation time constant (typically $\approx 30$ s). This equation dictates that following a current step, $V_{rc}$ approaches the steady-state value $I R_1$ exponentially.
+
+\noindent$\blacktriangleright$\ \textbf{Implicit Current-Power Coupling}\par
+Treating the smartphone as a constant-power load, the instantaneous power $P_{tot}(t;s)$ must satisfy:
+
+
+\begin{equation}\label{eq:ptot_balance}
+P_{tot}(t;s) = I(t) \cdot V_{term}(t)
+\end{equation}
+
+Substituting Eq.~\eqref{eq:vterm} into Eq.~\eqref{eq:ptot_balance} yields an implicit algebraic constraint for the current $I(t)$:
+
+
+\begin{equation}\label{eq:implicit_current}
+I(t)[V_{ocv}(\xi) - I(t)R_0 - V_{rc}] = P_{tot}(t;s)
+\end{equation}
+This equation embodies the system's \textbf{negative feedback loop}: a decrease in $V_{ocv}$ necessitates a higher current $I$ to maintain constant power $P_{tot}$, which increases the voltage drop $I R_0$, further depressing $V_{term}$. This mechanism explains the ``accelerated drain'' observed at low battery levels. We solve Eq.~\eqref{eq:implicit_current} using the Newton--Raphson method at each time step.
+
+\noindent$\blacktriangleright$\ \textbf{SOC-Dependent Internal Resistance}
+Internal resistance increases nonlinearly at low SOC. We model this utilizing the empirical relation:
+
+
+\begin{equation}\label{eq:r0_soc}
+R_0(\xi) = R_{0,nom} [1 + k_r(1-\xi)^2]
+\end{equation}
+where $k_r \approx 0.4$. As $\xi \to 0$, $R_0$ increases by roughly 40\%, significantly amplifying Joule heating losses ($I^2 R_0$).
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.99\textwidth]{Paper_Fig2_内阻特性.png}
+	\caption{SOC-dependent internal resistance characteristics.}\label{fig:fig1}
+\end{figure}
+Fig.~\ref{fig:fig1}(a) highlights the SOC dependency of $R_0(\xi)$: it remains near the nominal plateau ($50\,\text{m}\Omega$) through the early and mid-discharge stages, but rises sharply once $\xi<40\%$, ending about 35\% higher near cutoff. This nonlinearity is consequential; as shown in Figs.~\ref{fig:fig1}(b)--\ref{fig:fig1}(c), it increases Joule losses and reduces energy-conversion efficiency.
+\subsection{Component-Level Smartphone Power Modeling}
+\noindent$\blacktriangleright$\ \textbf{Decomposition Strategy}\par
+To accurately capture external load characteristics, we decompose the total power consumption $P_{tot}(t;s)$ of a smartphone into a linear superposition of power consumption from five major hardware components. Based on relevant literature and measured data, the modeling for each component is as follows: 
+\begin{enumerate}
+\renewcommand{\labelenumi}{\arabic{enumi}.}
+\item \textbf{Display Power}\par The power consumption of liquid crystal displays is primarily dominated by the backlight module and exhibits a power-law relationship with brightness settings:
+
+\begin{equation}\label{eq:pd_brightness}
+P_d(B) = P_{d,max} \left( \frac{B}{B_{max}} \right)^\gamma
+\end{equation}
+
+In the equation, $B$ represents the current brightness, and $B_{max}$ denotes the maximum brightness. $P_{d,max} \approx 1.0 \text{ W}$ indicates the power consumption at full brightness, while the exponent $\gamma \approx 2.0$ reflects the nonlinear drive characteristics of the LED backlight.
+
+\item \textbf{Processor Power}\par  The CPU power model is a nonlinear function of frequency, utilization, and temperature:
+
+\begin{equation}\label{eq:pc_dvfs}\tag{8}
+P_c(f,u) = k_c f \left( \frac{f}{f_{max}} \right)^2 u [1 + \alpha_T(\Theta - \Theta_{ref})]
+\end{equation}
+
+This aquation is based on CMOS circuit physics and microarchitecture control mechanisms, not a data-fitting model. Its physical mechanism is as follows:
+\begin{enumerate}
+\renewcommand{\labelenumi}{(\alph{enumi})}
+\item \textbf{Dynamic Power--DVFS Coupling Mechanism}: The instantaneous dynamic power consumption in CMOS circuits arises from the charging/discharging of load capacitance, governed by\par
+$$P_{dyn} \propto C_{eff} \cdot V^2 \cdot f$$\par
+Modern processors optimize energy efficiency through \textbf{Dynamic Voltage and Frequency Scaling (DVFS)}. Since voltage and frequency are approximately linearly correlated, we obtain the cubic scaling law\par
+$$P_{dyn} \propto f^3$$ \par
+\item \textbf{Workload Activity Factor Correction}: The utilization parameter $u\in[0,1]$ describes the proportion of processor active time, mapping computational task density to the circuit switching activity factor (see Bienia et al., 2008).
+\item \textbf{Linearization of Thermal Leakage Effects}: The temperature correction term characterizes static leakage current. A \textbf{first-order Taylor expansion} is used for linear approximation, reducing computational stiffness and improving numerical efficiency.
+\end{enumerate}
+
+ In summary, this model establishes a power consumption baseline based on physical laws and incorporates load and thermal corrections through engineering approximations, achieving a \textbf{high-fidelity} description of processor energy consumption behavior.\par
+
+\item \textbf{Network Power Consumption} The energy consumption of communication modules (WiFi/4G/5G) depends on data throughput and signal standards. We describe this using a discrete state machine model:
+\begin{equation}\label{eq:pn_state}
+P_n = \begin{cases}
+0.4\,\text{W}, & \text{WiFi connection (low load)} \\
+0.8\,\text{W}, & \text{4G connectivity (medium load)} \\
+1.2\,\text{W}, & \text{5G connectivity (high load)} \\
+0.02\,\text{W}, & \text{Standby/Idle}
+\end{cases}
+\end{equation}
+
+\item \textbf{Location Services Power Consumption} The GPS module exhibits a constant power load when activated:
+
+\begin{equation}\label{eq:pg_gps}
+P_g = \begin{cases}
+0.30\,\text{W}, & \text{GPS on} \\
+0, & \text{GPS off}
+\end{cases}
+\end{equation}
+
+\item \textbf{Background Services}: The baseline power consumption required to maintain the system kernel, sensor sampling, and background processes:
+
+\begin{equation}\label{eq:pb_baseline}
+P_b \approx 0.10\,\text{W}
+\end{equation}
+\end{enumerate}
+
+\textbf{Scenario Synthesis of Total Power Consumption}
+
+For any given usage scenario $s_j$ ($j=1,\dots,5$, covering standby, browsing, video, gaming, navigation), the total power consumption is defined as the sum of power consumption from each component:
+
+\begin{equation}\label{eq:ptot_synthesis}
+P_{tot}(s_j) = P_d(s_j) + P_c(s_j) + P_n(s_j) + P_g(s_j) + P_b
+\end{equation}
+
+Specific parameter configurations for each typical scenario are detailed in Table~\ref{tab:power_breakdown}.
+
+\begin{table}[htbp]
+\centering
+\caption{Power consumption breakdown for five typical usage scenarios (Unit: W).}
+\label{tab:power_breakdown}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scenario} & $P_d$ & $P_c$ & $P_n$ & $P_g$ & $P_b$ & $P_{tot}$ \\
+\midrule
+Standby    & 0.00 & 0.05 & 0.02 & 0.00 & 0.08 & 0.15 \\
+Browse     & 0.36 & 0.23 & 0.15 & 0.00 & 0.10 & 0.84 \\
+Video      & 0.64 & 0.50 & 0.25 & 0.00 & 0.10 & 1.49 \\
+Game       & 1.00 & 1.35 & 0.15 & 0.00 & 0.10 & 2.60 \\
+Navigation & 0.49 & 0.30 & 0.35 & 0.30 & 0.10 & 1.54 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{Paper_Fig3_功耗分解.png}
+\caption{Power decomposition for typical scenarios.}
+\label{fig:fig3_power_decomposition}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{Task2_Time_to_Empty.png}
+\caption{Time-to-Empty ($T_{empty}$) prediction results under typical scenarios.}
+\label{fig:task2_time_to_empty}
+\end{figure}
+\subsection{Coupled System of Ordinary Differential Equations}
+By integrating the aforementioned submodels, we have constructed a coupled system of ordinary differential equations with four state variables. The system state vector is defined as $\mathbf{y}(t)=[\xi(t), V_{rc}(t), \Theta(t), \mathcal{F}(t)]^\top$.\par
+\noindent$\blacktriangleright$\ \textbf{Equation 1: SOC Dynamics (Conservation of Charge)}\par
+This equation describes the evolution of a battery's state of charge. Define SOC ($\xi$) as the ratio of the remaining charge $Q(t)$ to the maximum available capacity $Q_{max}$:
+
+$$\xi(t) = \frac{Q(t)}{Q_{max}}$$
+
+Differentiating this and substituting the current definition $I(t) = -dQ/dt$ (with discharge being positive), yields the rate of change under ideal conditions:
+
+$$\frac{d\xi}{dt} = -\frac{I(t)}{Q_{max}}$$
+
+Further accounting for capacity decay ($Q_{max} = Q_n \mathcal{F}(t)$) and coulombic efficiency $\eta$ yields the final kinetic equation:
+
+\begin{equation}
+\label{eq:soc_dynamics_short}
+\frac{d\xi}{dt} = -\frac{I(t)}{Q_n \mathcal{F}(t) \eta(\xi, \Theta)}
+\end{equation}
+
+where $Q_n$ is the nominal capacity, $\mathcal{F}(t) \in [0,1]$ is a dimensionless health factor, and $\eta$ is a temperature-dependent efficiency coefficient (typically $\eta \approx 0.98$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{Task1_SOC轨迹.png}
+\caption{SOC discharge trajectory }
+\label{fig:task1_soc_traj}
+\end{figure}
+Based on our modeling, we conducted simulation runs and obtained the Time-to-Exhaustion (TTE) for different usage patterns at 100\% initial State of Charge (SOC).
+\begin{table}[H]
+\centering
+\caption{Time-to-Empty (TTE) under typical usage modes.}
+\label{tab:tte_modes}
+\begin{tabular}{lc}
+\toprule
+\textbf{Mode} & \textbf{TTE (hours)} \\
+\midrule
+Idle & 17.05 \\
+Browsing & 11.98 \\
+Video & 9.97 \\
+Gaming & 8.27 \\
+Navigation & 10.19 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent$\blacktriangleright$\ \textbf{Equation 2: RC Polarization Dynamics (Transient Response)}\par
+This equation describes the dynamic response of the polarization voltage $V_{rc}$ to the load current. Based on KCL analysis of the Thevenin circuit model, the total current $I(t)$ flowing through the RC parallel branch satisfies:
+
+$$I(t) = \frac{V_{rc}}{R_1} + C_1 \frac{dV_{rc}}{dt}$$
+
+Introducing the time constant $\tau = R_1 C_1$ and rearranging yields a first-order linear ordinary differential equation:
+\begin{equation}
+\label{eq:vrc_dynamics_short}
+\frac{dV_{rc}}{dt} = \frac{I(t)R_1 - V_{rc}}{\tau}
+\end{equation}
+This equation indicates that $V_{rc}$ continuously approaches its steady-state value $I R_1$ at a rate of $1/\tau$, accurately reflecting the physical inertia involved in the establishment and decay of electrochemical polarization.\par
+\noindent$\blacktriangleright$\ \textbf{Equation 3: Thermodynamics (Conservation of Energy)}\par
+This equation is derived from the first law of thermodynamics, treating the battery as a homogeneous lumped-parameter thermal system. The rate of change of internal energy $\frac{dE_{internal}}{dt}$ equals the difference between the internal heat generation rate $\dot{Q}_{gen}$ and the external heat dissipation rate $\dot{Q}_{diss}$:
+
+$$m c_p \frac{d\Theta}{dt} = \dot{Q}_{gen} - \dot{Q}_{diss}$$
+
+Here, the left-hand side reflects thermal energy accumulation ($m$ is the battery mass, $c_p$ is the specific heat capacity, $E_{internal}$ is the internal energy); The heat generation term $\dot{Q}_{gen}$ on the right originates from irreversible Joule heating through internal resistances $R_0$ and $R_1$ (neglecting reversible entropy heat); the heat dissipation term $\dot{Q}_{diss}$ follows Newton's cooling law (dependent on heat transfer coefficient $h$, surface area $A$, and ambient temperature $\Theta_\infty$). Combining these yields the differential equation for thermal evolution:
+
+\begin{equation}
+\label{eq:thermal_dynamics_short}
+m c_p \frac{d\Theta}{dt} = \underbrace{I^2 R_0}_{\text{Joule heat}} + \underbrace{I^2 R_1}_{\text{polarization heat}} - \underbrace{hA(\Theta - \Theta_\infty)}_{\text{convective heat dissipation}}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{Task3_物理模型验证.png}
+\caption{Physical-model validation results }
+\label{fig:task3_physical_validation}
+\end{figure}
+Analysis of Fig.~\ref{fig:task3_physical_validation} (left panel):\par
+\vspace{-0.3cm}
+The trajectory of terminal voltage $V$ (Fig.~\ref{fig:task3_physical_validation}, left) deviates significantly from the conventional constant-current model. During the first 85\% of the discharge cycle, $V$ maintains a quasi-steady-state decline, followed by a steep nonlinear drop as the state of charge (SOC) approaches the cutoff threshold. This "cliff-like" decay validates the strong negative feedback mechanism defined by Eq.~\eqref{eq:implicit_current}: $I(t)[V_{ocv} - IR_{int}] = P_{const}$. As $V_{ocv}$ declines, the system must sustain constant power by surging current $I(t)$, thereby accelerating voltage collapse. Correspondingly, the thermal response curve (Fig.~\ref{fig:task3_physical_validation}, right) shows the battery maintains near-equilibrium with ambient temperature throughout most of the discharge period. This stability indicates passive cooling effectively counteracts self-heating effects within the healthy capacity range. However, during the final 30-60 minutes of discharge, the temperature curve exhibits a sharp inflection point. As $\xi \to 0$, the internal resistance $R_0$ increases exponentially, causing the heat generation rate $\dot{Q}_{gen}$ to exceed the dissipation limit and trigger rapid heat accumulation.
+
+
+
+\noindent$\blacktriangleright$\ \textbf{Equation 4: Capacity Decay (Aging Dynamics)}\par
+
+This equation describes the degradation of battery health over time, with its overall rate composed of the superposition of \textbf{Calendar Aging} and \textbf{Cyclic Aging}: The former is primarily driven by temperature and high SOC-induced SEI film growth, following Arrhenius kinetics: $\left( \frac{d\mathcal{F}}{dt} \right)_{cal} \approx -\lambda_{0,cal} \exp \left[ \frac{E_a}{R_g} \left( \frac{1} {298} - \frac{1}{\Theta} \right) \right] \xi^{0.5}$; the latter originates from active lithium loss during charge-discharge cycles, assumed to be proportional to cumulative current throughput $\left( \frac{d\mathcal{F}}{dt} \right)_{cyc} \approx -\lambda_{0,cyc} |I(t)|$.
+
+The combined total aging kinetic equation is:
+
+\begin{equation}
+\label{eq:capacity_decay_short}
+\frac{d\mathcal{F}}{dt} = -\lambda_{cal}(\Theta, \xi) - \lambda_{cyc}(I, \Theta)
+\end{equation}
+
+where $\lambda_{cal}$ and $\lambda_{cyc}$ represent the aging rates, respectively. Typical parameters: $\lambda_{0,cal} = 1 \times 10^{-8} \text{ s}^{-1}$, $\lambda_{0,cyc} = 5 \times 10^{-9} \text{ A}^{-1}\text{s}^{-1}$, $\Theta$ is temperature, $E_a$ is the activation energy, and $R_g$ is the gas constant.\par
+\noindent$\blacktriangleright$\ \textbf{Boundary Conditions and Numerical Solution}\par
+
+The system's initial state is set to fully charged, non-polarized, and in thermal equilibrium:
+\begin{equation}\label{eq:initial_state}\tag{17}
+\mathbf{y}(0) = [\xi_0, 0, \Theta_\infty, 1]^\top
+\end{equation}
+The simulation termination condition (i.e., endurance time $T_{empty}$) is defined as the moment when the SOC trajectory first reaches the cutoff threshold:\par
+\begin{equation}\label{eq:time_to_empty}\tag{18}
+T_{empty} = \inf \{ t \ge 0 : \xi(t) \le \xi_{cutoff} = 0.05 \}
+\end{equation}
+Equations~(13)--(16) form a system of rigid ODEs, encompassing second-scale RC responses and hour-scale SOC variations. The LSODA method via \texttt{scipy.integrate.solve\_ivp} is employed for solution: this algorithm automatically switches based on local equation characteristics---using the Adams--Moulton method in non-rigid regions to enhance efficiency, and switching to the BDF method in rigid regions to ensure stability, effectively addressing multi-timescale features. An event function captures the moment when $\xi=0.05$. At each step, $I(t)$ is obtained by iteratively solving Eq.~\eqref{eq:implicit_current} using fixed-point iteration.
+
+
+\subsection{Model Validation and Results Analysis}
+\vspace{-0.2cm}
+\textbf{Time-to-Empty Prediction Results} Table~\ref{tab:tte_summary} summarizes the predicted runtime values for each scenario. The results indicate that runtime in high-power scenarios (such as gaming) is significantly lower than the linear estimate based on average power consumption. This aligns closely with the qualitative description of the Peukert effect, demonstrating that the model successfully captures the capacity loss mechanism during high-rate discharging.
+
+\begin{table}[htbp]
+\centering
+\caption{Time-to-Empty summary of prediction results.}
+\label{tab:tte_summary}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Scene} & $P_{tot}$ (W) & $T_{empty}$ (h) & \textbf{Average current} (A) & \textbf{Peak temperature} ($^\circ$C) \\
+\midrule
+Standby    & 0.15 & 12.81 & 0.041 & 25.2 \\
+Browse     & 0.84 & 10.28 & 0.232 & 25.8 \\
+Video      & 1.49 & 9.27  & 0.412 & 26.3 \\
+Game       & 2.60 & 8.17  & 0.721 & 27.1 \\
+Navigation & 1.54 & 9.20  & 0.426 & 26.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{-0.5cm}
+\subsection{Summary of Question 1}
+\vspace{-0.3cm}
+This section developed a robust continuous-time battery model rooted in electrochemical and thermodynamic principles. By incorporating a Thevenin equivalent circuit, the model accurately captures transient dynamics. The mechanistic decomposition of power loads ensures interpretability, while the explicit ODE formulation allows for generalization to varying environmental conditions and aging states.
+\vspace{-0.3cm}
+\section{\textsc{Task 2} :Discharge Time Prediction}
+\subsection{Methodological Overview}
+Drawing from the continuous-time framework in Task 1, we analyze battery endurance by mapping $T_{empty}$ across diverse initial states and usage profiles. Our objective is twofold: to forecast discharge timelines and to isolate the physical drivers—or surprising non-factors—of depletion. 
+
+We integrate analytical energy-balance approximations with numerical sensitivity diagnostics, specifically local derivatives and global variance decomposition. This hybrid strategy reconciles predictive precision with mechanistic insight. To validate the model, we systematically explored a $5 \times 5$ parameter space, crossing initial SOC levels $\xi_0 \in \{1.0, 0.8, 0.6, 0.4, 0.2\}$ with five operational modes $s \in \{\text{Standby, Browsing, Video, Gaming, Navigation}\}$. This matrix yields 25 distinct scenarios, providing a robust dataset to identify dominant stressors and evaluate the model's diagnostic depth.
+
+\subsection{Theoretical Framework for Predicting Battery Depletion Time}
+To understand how battery life depends on operating conditions, we first derive an analytical expression for $T_{empty}$ from the coupled ODE system. Recalling the SOC dynamic equation from Problem 1:
+\begin{equation}\label{eq:soc_dynamics_task2}\tag{19}
+\frac{d\xi}{dt} = -\frac{I(t;\xi,\Theta)}{Q_n \mathcal{F}(t) \eta(\xi,\Theta)}
+\end{equation}
+Here, $I$ denotes the discharge current, $Q_n$ represents the nominal capacity, $\mathcal{F}$ signifies the capacity decay factor, and $\eta$ indicates the coulombic efficiency.
+\subsubsection{Simplification under the quasi-steady-state approximation}
+For short-term predictions (time scale $\ll$ battery lifetime), capacity degradation is negligible ($\mathcal{F} \approx 1$), and thermal effects rapidly reach quasi-equilibrium ($d\Theta/dt \approx 0$). Under these conditions, the current $I$ can be approximated based on the power-voltage coupling relationship derived from the first-order Thevenin equivalent circuit model ($V_{term} = V_{ocv} - IR_0 - V_{rc}$) in Problem 1:
+\vspace{-0.3cm}
+\begin{equation}\label{eq:current_qss}\tag{20}
+I \approx \frac{P_{tot}(s)}{V_{ocv}(\xi) - I R_0 - V_{rc}}
+\end{equation}
+Here, $P_{tot}(s)$ denotes the total power consumption of scenario $s$, $V_{ocv}(\xi)$ represents the open-circuit voltage, $R_0$ is the ohmic resistance, and $V_{rc}$ is the polarization voltage.
+
+Given the nonlinear nature of the OCV-SOC relationship for lithium-ion batteries, we perform a \textbf{first-order Taylor expansion} near the operating point $\bar{\xi}=(\xi_0+0.05)/2$:
+
+\begin{equation}\label{eq:ocv_linearization}\tag{21}
+V_{ocv}(\xi) \approx V_{ocv}(\bar{\xi}) + V'_{ocv}(\bar{\xi}) \cdot (\xi - \bar{\xi})
+\end{equation}\par
+where $\bar{\xi}$ is the average SOC of the discharge interval, and $V'_{ocv}(\bar{\xi})$ is the slope of the OCV curve. This linearization preserves the primary voltage-capacitance trend while significantly reducing mathematical complexity, enabling the derivation of analytical solutions and facilitating efficient engineering estimation.
+Substituting the linearized OCV equation~\eqref{eq:ocv_linearization} into the coupling equation~\eqref{eq:current_qss}, and assuming the polarization voltage is much smaller than the open-circuit voltage ($V_{rc} \ll V_{ocv}$) to neglect higher-order polarization terms, we derive the effective discharge current through the following steps:\par
+First, list the constant-power load equation and the simplified terminal voltage equation:
+\par
+$$P_{tot}(s) = I \cdot V_{term}, \quad V_{term} \approx V_{ocv}(\bar{\xi}) - I R_0$$
+\vspace{-0.2cm}
+Zero-order current estimation ignoring internal resistance voltage drop ($R_0 \approx 0$):
+\vspace{-0.2cm}
+$$I_0 \approx \frac{P_{tot}(s)}{V_{ocv}(\bar{\xi})}$$
+\vspace{-0.2cm}
+Substitute the zero-order current into the voltage equation for first-order correction:
+\vspace{-0.3cm}
+$$V_{term} \approx V_{ocv}(\bar{\xi}) - I_0 R_0 = V_{ocv}(\bar{\xi}) - \frac{P_{tot}(s) R_0}{V_{ocv}(\bar{\xi})}
+\vspace{-0.3cm}
+Recalculate the current using the corrected terminal voltage:
+\vspace{-0.3cm}
+
+$$I \approx \frac{P_{tot}(s)}{V_{term}} \approx \frac{P_{tot}(s)}{V_{ocv}(\bar{\xi}) - \frac{P_{tot}(s) R_0}{V_{ocv}(\bar{\xi})}}$$
+
+To simplify the expression algebraically by extracting the greatest common divisor from the denominator:\par
+
+$$I \approx \frac{P_{tot}(s)}{V_{ocv}(\bar{\xi}) \left[ 1 - \frac{P_{tot}(s) R_0}{V_{ocv}(\bar{\xi})^2} \right]}$$
+
+The approximate formula for the effective discharge current is ultimately obtained:
+\begin{equation}\label{eq:ieff}\tag{22}
+I \approx \frac{P_{tot}(s)}{V_{ocv}(\bar{\xi})} \left[ 1 - \frac{R_0 P_{tot}(s)}{V_{ocv}(\bar{\xi})^2} \right]^{-1} \equiv I_{eff}(s)
+\end{equation}
+\vspace{-0.3cm}
+
+Here, $I_{eff}(s)$ denotes the effective average discharge current under scenario $s$, providing a constant-current approximation independent of real-time SOC. The correction factor $\left[ 1 - \frac{R_0 P_{tot}(s)}{V_{ocv}(\bar{\xi})^2} \right]^{-1}$ quantifies the voltage drop impact caused by internal resistance $R_0$: For the same power demand, an increase in internal resistance or a decrease in voltage will cause the equivalent current to increase nonlinearly, resulting in reduced runtime.\par
+
+Subsequently, based on the effective current $I_{eff}$, we solve the SOC dynamics equation by definite integration.
+First, treating the current in the SOC rate-of-change equation as a constant, we separate the time variable $t$ from the state variable. $\xi$:\par
+$$dt = - \frac{Q_n \cdot \eta}{I_{eff}(s)} d\xi$$\par
+Second, perform definite integration on both sides of the equation, specifying the physical boundary conditions (time from $0$ to $T_{empty}$, SOC from $\xi_0$ to $0.05$):\par
+$$\int_{0}^{T_{empty}} dt = - \frac{Q_n \cdot \eta}{I_{eff}(s)} \int_{\xi_0}^{0.05} d\xi$$\par
+Compute the definite integral and tidy up the symbols:\par
+
+$$T_{empty} = - \frac{Q_n \cdot \eta}{I_{eff}(s)} \cdot [\xi]_{\xi_0}^{0.05} = \frac{Q_n \cdot \eta}{I_{eff}(s)} (\xi_0 - 0.05)$$\par
+
+Finally, introducing the time conversion factor 3600 (to convert seconds to hours), we obtain the analytical expression:\par
+
+\begin{equation}\label{eq:time_to_empty_analytic}\tag{23}
+T_{empty}(\xi_0, s) = \frac{(\xi_0 - 0.05) \cdot Q_n \cdot \eta}{I_{eff}(s) \cdot 3600}
+\end{equation}\par
+where \textbf{3600} is the time conversion factor (A·s → h), and \textbf{0.05} is the safety threshold for discharge cutoff (5\% SOC).
+
+From a \textbf{physical perspective}, the numerator $(\xi_0 - 0.05) \cdot Q_n \cdot \eta$ represents the \textbf{effective net charge} accounting for coulombic efficiency, while the denominator $I_{eff}(s)$ denotes the charge consumption rate. The formula reveals that runtime is determined by the linear ratio of \textbf{available charge reserve} to \textbf{load consumption rate}, providing a theoretical benchmark for rapid estimation across different scenarios.
+\subsubsection{Energy-Based Interpretation}
+Equation~\eqref{eq:energy_based_tempty} reveals that $T_{empty}$ is fundamentally determined by the ratio of \textbf{available energy} to \textbf{average power}:
+
+\begin{equation}\label{eq:energy_based_tempty}\tag{24}
+T_{empty} \propto \frac{\text{available energy}}{\text{average power}} = \frac{\Delta\xi \cdot Q_n \cdot \bar{V}}{P_{tot}(s)}
+\end{equation}
+
+Here, $\bar{V}$ denotes the average discharge voltage, used to map charge capacity $Q_n$ (Ah) to energy capacity (Wh); $\Delta\xi = \xi_0 - 0.05$ represents the effective discharge window, reflecting the proportion of chemical energy actually extractable.
+
+From a \textbf{physical essence} perspective, this formula embodies the \textbf{law of conservation of energy} at the macroscopic timescale, revealing that runtime is determined by the normalization of \textbf{effective electrochemical energy reserves} (numerator) by \textbf{load power dissipation rate} (denominator). This linear relationship provides a clear and robust first-order physical picture for complex electrochemical processes.\par
+From a \textbf{mathematical perspective}, this equation reveals two core scaling laws of the system:
+
+\begin{enumerate}
+\item \textbf{Linearity Law}: $T_{empty}$ exhibits a linear relationship with the initial charge $\xi_0$ (when the scenario is fixed);
+\item \textbf{Inverse Proportionality Law}: $T_{empty}$ is inversely proportional to the total load power $P_{tot}$ (when the initial charge is fixed). This concise algebraic relationship, while neglecting transient details of voltage drops, captures the system's dominant first-order dynamics. It explains why the trend of reduced endurance in high-power scenarios follows a hyperbolic characteristic.
+\end{enumerate}
+
+\subsection{Experimental Validation}
+To validate these theoretical predictions, we solved the complete nonlinear ODE system for 25 combinations of $(\xi_0, s)$ and compared the results with equation (23). Figure~\ref{fig:f1} displays the complete SOC trajectory matrix.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{第二题图/F1.png}
+\caption{Grouped SOC Trajectories by Usage Pattern}
+\label{fig:f1}
+\end{figure}
+\vspace{-0.5cm}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{第二题图/F2.png}
+\caption{Batter Duration Disparity Arcoss Usage Models}
+\label{fig:f2}
+\end{figure}
+\vspace{-0.5cm}
+Fig.~\ref{fig:f1} illustrates the nonlinear SOC depletion trajectory under constant-power loading. A downward-curving trajectory is observed across all operating modes, stemming from the inherent negative feedback mechanism of constant-power discharge: as terminal voltage decreases, current input must increase to maintain power balance, thereby accelerating SOC depletion.
+
+Quantitative analysis of the resulting duration matrix $\mathbf{T} \in \mathbb{R}^{5 \times 5}$ (as shown in Fig.~\ref{fig:f2}) reveals pronounced load-dependent sensitivity. High-intensity tasks (e.g., "Gaming") exhibit quasi-exponential runtime decay, while low-intensity tasks maintain near-linear behavior. Notably, the runtime difference between "Browsing" and "Video" is significantly smaller than that between "Idle" and "Gaming," indicating markedly reduced sensitivity to battery life within the medium-power range. Furthermore, as the initial state of charge (SOC) decreases, the duration curves for all strategies converge, indicating that in low-charge scenarios, the initial energy reserve becomes a more dominant limiting factor than usage patterns. Regression analysis of the $\mathbf{T}$ data further validates these nonlinear trends, aligning with empirical observations of mobile device energy dynamics.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{第二题图/F3.png}
+\caption{Linearity of Battery Duration vs Initial Charge}
+\label{fig:f3}
+\end{figure}
+\vspace{-0.5cm}
+Additionally, we performed linear regression fitting on the actual data points (e.g., Figure~\ref{fig:f3}), where $R^2_{min}>0.86$ indicates that a simple linear model-such as $TTE \propto SOC_0$-holds true at a macro level. This also explains why it is commonly believed that "each 1\% of a phone's battery charge should sustain the same amount of time."
+
+\begin{figure}[H]
+\centering
+\subfigure[Discharge of Acceleration\&The Reduction of Sustainability]{
+\includegraphics[width=0.48\linewidth]{第二题图/F4.png}
+\label{fig:f4}
+}
+\hfill
+\subfigure[Nonlinear V-I Copling\&Thermal Generation Dynamics]{
+\includegraphics[width=0.48\linewidth]{第二题图/F5.png}
+\label{fig:f5}
+}
+\caption{Key discharge dynamics under different perspectives.}
+\end{figure}
+\vspace{-0.5cm}
+The rapid rise in $|\frac{d\xi}{dt}|$ and thermal generation at low SOC Fig.~\ref{fig:f5} quantitatively explains the phenomenon of "battery anxiety" and device overheating near depletion.
+\subsection{Factors Contributing to Rapid Battery Drain}
+$\bullet$\textbf{Factors that reduce battery life:}
+As shown in Fig.~\ref{fig:f5}, the most significant factors influencing time (TTE) are $\eta$ and $Q_n$.\par
+$\bullet$\textbf{Factors with a surprisingly small impact on battery life:}
+As shown in Fig. 6, $R_0, R_1, C_1, h$ have relatively minor effects on maintaining the model. Furthermore, Monte Carlo simulations demonstrate that even without knowing the exact value of $R_0$, the impact on TTE predictions remains negligible. The model performs well under uncertainty in parameters such as $R_0$.
+\subsection{Conclusion of Question 2}
+Our continuous-time simulation reveals that battery endurance primarily depends on nominal capacity ($Q_n$) and conversion efficiency ($\eta$), while the impact of internal resistance and thermal fluctuations is surprisingly negligible. Rigorous Monte Carlo experiments and sensitivity tests confirm that the model maintains high predictive accuracy even with vaguely defined input parameters-a robustness critical for practical applications. A pronounced nonlinear decoupling exists between power demand and runtime: although gaming mode power consumption is 17 times that of standby mode, actual discharge time is reduced by only 1.56 times. Such results reveal the fundamental reason for the failure of static energy balance equations-only a nonlinear ordinary differential equation framework can fully capture the voltage-dependent feedback mechanisms inherent in modern electronic devices.
+
+However, the model's practicality is constrained by several idealized assumptions. The primary issue lies in the thermal module potentially underestimating actual temperature peaks-it disregards external heat flux and assumes uniform heat dissipation. Furthermore, while the constant-power premise serves as a "worst-case" benchmark for industry stress testing, it disregards the inherent burstiness and randomness of user behavior. Finally, the current framework ignores long-term electrode degradation, limiting its analysis to single cycles. Although these simplifications reduce computational overhead, the sensitivity study in \textbf{Task3} confirms the framework remains a reliable and viable tool for evaluating battery instantaneous performance.
+\vspace{-0.3cm}
+\section{\textsc{Task 3}: Model Sensitivity, Robustness, and Hypothesis Testing Analysis}
+\vspace{-0.4cm}
+After establishing a battery full life cycle model, defining its reliability boundaries is crucial. We rigorously test the model across two dimensions: \textbf{parameter uncertainty} (how input noise affects outputs) and \textbf{structural validity} (how simplifying assumptions impact physical fidelity).
+\vspace{-0.3cm}
+\subsection{Analyze the target}
+\vspace{-0.3cm}
+After establishing the physical model and validating its performance across various scenarios, this section aims to address the question of the model's reliability boundaries. We will conduct an in-depth analysis from the following three dimensions:
+\vspace{-0.3cm}
+\begin{enumerate}
+\item \textbf{Parameter Sensitivity (Robustness)}: When input parameters (such as $Q_{nom}, R_0$) undergo perturbations, does the model's predicted outcome $\text{Time-to-Empty}$ remain stable?
+\item \textbf{Assumption Validity}: If the simplifying assumptions introduced during modeling (e.g., constant power, constant ambient temperature) are relaxed, how much bias would this introduce into the results?
+\item \textbf{Uncertainty Quantification}: Considering the combined random errors of all parameters, what is the confidence interval for the prediction results?
+\end{enumerate}
+\subsection{ Parameter Sensitivity Analysis (Based on the SRC Method)}
+To identify which parameters dominate the uncertainty in predicting $\text{Time-to-Empty}$, we employed Standardized Regression Coefficients (SRC) for a global sensitivity analysis.
+\vspace{-0.5cm}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{第三题图/图3.png}
+\caption{Global Sentivity Analysis}
+\label{fig:q3_fig3}
+\end{figure}
+\vspace{-0.5cm}
+As shown in Fig.~\ref{fig:q3_fig3}, the variance contributions of model parameters exhibit a highly polarized distribution:
+
+Battery capacity $Q_n$ contributes \textbf{73.0\%} of the total variance. This indicates that the model represents a typical "capacity-dominated" system. The accuracy of our predictions is strictly constrained by the precision of the initial capacity estimate. Internal resistance $R_0$ and coulombic efficiency $\eta$ contribute 13.0\% and 9.0\%, respectively. Although correlated, their influence is significantly lower than that of capacity. Contributions from other parameters are all below 5\%.
+
+We therefore conclude that upgrading the \textbf{State of Health (SOH)} estimation algorithm to accurately pinpoint $Q_n$ is the primary task for improving prediction accuracy in future iterations, rather than fine-tuning thermal parameters.
+\vspace{-0.3cm}
+\subsubsection{Hypothesis of Relaxation versus Mechanism Comparison}
+Real-world conditions often violate idealized modeling assumptions. We introduced a \textbf{"Relaxation Mechanism"} to evaluate model validity. We selected three key assumptions ($A_1, A_2, A_3$) and replaced them with more complex, physically realistic models.
+
+\begin{table}[H]
+\centering
+\caption{Relaxation mechanisms for key modeling assumptions.}
+\label{tab:q3_relaxation}
+\begin{threeparttable}
+\begin{tabular}{llll}
+\toprule
+\textbf{ID} & \textbf{Assumed content} & \textbf{Original model} & \textbf{Relaxed model} \\
+\midrule
+A1 & Linear OCV--SOC & Polynomial interpolation & Nonlinear exponential fitting \\
+A2 & Constant usage pattern & $P(t)=P_0$ & $P(t)$ is a Markov process \\
+A3 & Constant ambient temperature & $\Theta_\infty=298.15\,\text{K}$ & $\Theta_\infty(t)=298.15+5\sin(\omega t)$ \\
+A4 & Ignore voltage cutoff & Only check $\xi\le 0.05$ & Dual criterion: $\xi\le 0.05$ or $V<2.7\,\text{V}$ \\
+A5 & Ideal Coulombic efficiency & $\eta=0.98$ (constant) & $\eta(\xi)=0.98\,(1-0.05(1-\xi)^2)$ \\
+A6 & Capacity linear decay & $F\propto -t$ & $F\propto -t^{1.5}$ (knee-point effect) \\
+A7 & Ignore self-discharge & $\xi_{\text{self}}=0$ & $\dot{\xi}_{\text{self}}=-k_{\text{self}}\xi$ \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+\vspace{-0.3cm}
+To verify the validity of the model assumptions, we selected the three most significant key assumptions affecting the system for in-depth analysis of their depth and reasonable boundaries:
+\begin{enumerate}
+\item \textbf{Relaxation A1 (OCV Nonlinearity)}: Compares the difference between our fitted nonlinear OCV curve and the simple linear approximation $V_{ocv} = a \cdot \mathrm{SOC} + b$.
+\item \textbf{Relaxation A2 (Constant Usage Pattern)}: Introduces a Markov Chain power model. Power $P(t)$ is no longer constant but randomly jumps between $P_{high}$ and $P_{low}$, simulating real-world "intermittent operation" by users.
+\item \textbf{Relaxation A3 (Constant Ambient Temperature)}: Introduces a sinusoidal temperature field $\Theta_{\infty}(t) = 298.15 + 5\sin\!\left(\frac{2\pi}{24}t\right)$, simulating the dynamic impact of diurnal temperature variations on battery internal resistance and chemical reaction rates.
+\end{enumerate}
+For the $k$th hypothesis $A_k$, we define its impact measure $\Delta_k$ as:
+\begin{equation}\label{eq:delta_k}
+\Delta_k = \frac{T(A_k) - T_{real}}{T_{real}} \times 100\%
+\end{equation}
+Here, $T_{real}$ denotes the predicted value under the ideal model (where all assumptions hold), while $T(A_k)$ represents the predicted value after relaxing only the $k$th assumption. If $|\Delta_k| > 5\%$, the assumption is deemed to have a significant impact on the model's conclusions. To assess the reasonable boundaries of assumptions, we introduce 'Validity':
+\begin{equation}\label{eq:validity_vk}
+V_k = \exp\left(-\frac{|\Delta_k|}{\sigma_k}\right)
+\end{equation}
+$V_k \to 1$ indicates the hypothesis is highly plausible, while $V_k \to 0$ indicates the hypothesis requires refinement. Here, $\sigma_k$ represents the acceptable error threshold (in this model, our team sets $\sigma_k = 3\%$).\par
+Below is our visual analysis:\par
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{第三题图/图1a.png}
+\caption{Impact vs Validity}
+\label{fig:q3_fig1a}
+\end{figure}
+As shown in Fig.~\ref{fig:q3_fig1a}, the "constant usage" assumption ($A_2$) exhibits the highest impact ($\Delta_k = 8.34\%$), exceeding our 5\% safety threshold, and $V_1=0.062<0.6$. This indicates the model's high sensitivity to user behavior. Compared to dynamic usage, the static load assumption underestimates battery life. Conversely, the relaxed ambient temperature ($A_3$) and linear OCV ($A_1$) assumptions yield negligible impacts ($\Delta_k<2\%$, $V_3>0.6$, $V_1\approx0.6$). This demonstrates our model's structural robustness against environmental fluctuations and OCV linearization errors.\par
+To understand the high impact of usage pattern ($A_2$), we plot a SOC trajectory comparison in Fig.~\ref{fig:q3_fig1b}.
+\vspace{-0.5cm}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth]{第三题图/图1b.png}
+\caption{SOC trajectory comparison}
+\label{fig:q3_fig1b}
+\end{figure}
+\vspace{-0.5cm}
+As shown in Fig.~\ref{fig:q3_fig1b}, compared to the constant-power baseline (9.97 hours), the Markov chain power distribution (blue dashed line) results in a longer $\text{discharge cutoff time}$ (10.81 hours). \textbf{Physical reasoning explanation (recovery effect):} The inset in Figure 1b shows that the Markov process incorporates low-power or idle periods. During these low-current intervals, concentration polarization within the battery relaxes, causing a slight "rebound" in terminal voltage. This \textbf{Battery Recovery Effect} enables the Markov model to extract more usable energy before reaching the cutoff voltage, accounting for the 8.34\% increase in lifespan.
+\subsubsection{Monte Carlo-Based Uncertainty Quantification}
+Due to the excessive computational cost of global sensitivity analysis based on Sobol's method, we employ \textbf{Monte Carlo Simulation} combined with \textbf{Standardized Regression Coefficients (SRC)} to quantify uncertainty. The approach is outlined below:
+\vspace{-0.3cm}
+\begin{enumerate}
+\item \textbf{Sampling}: Perform $N=1000$ Latin hypercube sampling (LHS) for key parameters, assuming they follow a normal distribution $\mathcal{N}(\mu, (0.05\mu)^2)$.
+\item \textbf{Propagation}: Run 1000 ODE simulations to obtain the distribution of $Time-to-empty(hours)$.
+\item \textbf{Attribution}: Using multiple linear regression $y = \beta_0 + \sum \beta_i x_i + \epsilon$, compute standardized coefficients $\beta_i^*$. The squared value $(\beta_i^*)^2$ approximates the parameter's contribution to the total variance.
+\end{enumerate}
+\vspace{-0.3cm}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\linewidth,height=0.32\textheight]{第三题图/图2.png}
+\caption{Uncertainty Distribution of Battery Life}
+\label{fig:q3_fig2}
+\end{figure}
+The $\text{discharge cutoff time}$ derived from Fig.~\ref{fig:q3_fig2} follows a nearly perfect normal distribution $\mathcal{N}(10.01, 0.47^2)$. We calculated the \textbf{95\% confidence interval} as $[9.11, 10.97]$ hours. The distribution's narrow dispersion (coefficient of variation $\approx 4.7\%$) demonstrates our model's \textbf{robust stability}. Even with noisy inputs, predictions avoid chaotic divergence, ensuring reliable guidance for users.
+\vspace{-0.3cm}
+\section{\textsc{Task4} :Practical Implementation & Model Generalization}
+Based on the coupled electro-thermal model established in previous sections, we translate theoretical non-linear characteristics into actionable strategies for users and OS designers, and demonstrate the model's scalability.
+\vspace{-0.3cm}
+\subsection{User Guidelines for Efficiency}
+$\bullet$\textbf{Network Selection (WiFi Priority):} Our quantification shows power consumption follows $P_{5G} (1.2W) > P_{4G} (0.8W) > P_{WiFi} (0.4W)$. \par
+$\bullet$\textbf{Recommendation:} Prioritize WiFi to reduce communication power by 66\%. In unstable signal areas, enable \textbf{Airplane Mode} immediately to prevent the device from entering high-power signal search loops.\par
+$\bullet$\textbf{Optimal Screen Brightness:} Display power follows a power law $P_d \propto B^{2.0}$. Reducing brightness significantly extends battery life. \textbf{Recommendation:} Avoid 100\% brightness unless necessary. However, purely minimum brightness is discouraged to prevent eye strain; auto-adjustment to ambient light is optimal.\par
+$\bullet$Low-Battery Load Management (<40\% SOC):** The model reveals a positive feedback loop at low SOC: $V \downarrow \Rightarrow I \uparrow \Rightarrow SOC \downarrow \Rightarrow V \downarrow$. So when SOC < 40\%, stop high-load tasks (e.g., gaming) immediately to break this "Current-Thermal" vicious cycle and prevent rapid depletion.
+\vspace{-0.3cm}
+\subsection{ OS Optimization Strategies}
+$\bullet$\textbf{Preemptive Current Throttling:} The OS should monitor the derivative $dI/dt$. When a sharp rise is detected (indicating the onset of the feedback loop), the system should cap the CPU frequency $f$ and max power $P_{max}$ to force the battery into a safe discharge zone.\par
+$\bullet$\textbf{Probabilistic Duration Display:} Instead of a deterministic "Time Remaining," the UI should display a confidence interval (e.g., $T \in [t_{min}, t_{max}]$) based on real-time sensor data (temperature, load volatility) to manage user expectations realistically.
+\subsection{ Model Generalization (From Phones to Drones)}
+The core electrochemical dynamics (Eqs.~\eqref{eq:soc_dynamics_short}--\eqref{eq:capacity_decay_short})are universal. To adapt the model for other devices, we only need to modify the \textbf{Load Model} ($\mathcal{M}$) and \textbf{Thermal Boundary} ($\mathcal{H}$), as shown in Table~\ref{tab:device_adaptation}.
+\vspace{-0.5cm}
+\begin{table}[H]
+\centering
+\caption{Model adaptation for various devices.}
+\label{tab:device_adaptation}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.95}
+\begin{tabular}{p{0.22\linewidth}p{0.28\linewidth}p{0.45\linewidth}}
+\toprule
+\textbf{Device Type} & \textbf{Heat Dissipation Mechanism} & \textbf{Modification to Thermal Model ($h, A$)} \\
+\midrule
+Smartphone & Natural convection + hand conduction & Keep current model; $h$ varies with holding state. \\
+\midrule
+Drone (UAV) & Forced convection (propeller downwash) & $h$ becomes a function of RPM: $h(\omega) \propto \omega^{n}$. Cooling is aggressive but affects low-temperature performance. \\
+\midrule
+High-performance laptop & Active cooling (fan/liquid) & Add active control term: $\dot{Q}_{cool} = \dot{m} c_p (T_{out} - T_{in})$. \\
+\midrule
+Wearable & Skin coupling & Boundary changes to constant skin temperature ($T_{skin} \approx 32^{\circ}\mathrm{C}$). \\
+\bottomrule
+\end{tabular}
+\end{table}
+\section{Strengths and Weaknesses}
+\textbf{The advantages and disadvantages of our model are shown in the table below:}
+\begin{table}[H]
+\centering
+\caption{Strengths and weaknesses of the proposed approach.}
+\label{tab:strengths_weaknesses}
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{p{0.18\linewidth}p{0.77\linewidth}}
+\toprule
+\textbf{Category} & \textbf{Summary} \\
+\midrule
+\textbf{Strengths} & High interpretability: Unlike data-driven ``black-box'' approaches, our physicochemical ``white-box'' model is grounded in electrochemical equations, clearly elucidating the underlying mechanisms of power depletion. \\
+& Insight into failure mechanism: The model identifies the vicious cycle $V\downarrow \Rightarrow I\uparrow \Rightarrow SOC\downarrow \Rightarrow V\downarrow$, explaining rapid battery drainage near depletion. \\
+& Efficiency and robustness: By using Standardized Regression Coefficients (SRC) instead of computationally expensive global methods (e.g., Sobol's), we improved efficiency; the analysis highlights $Q_n$ as the critical factor and shows robustness against variations in parameters like $C$ and $h$. \\
+\midrule
+\textbf{Weaknesses} & Simplified usage assumption: Assuming a constant usage mode overlooks stochastic real-world behavior and may introduce deviations; future work can incorporate a Markov chain to simulate dynamic user state transitions. \\
+& Idealized thermal dynamics: The model may underestimate battery operating temperatures due to a simplified heat-exchange model that neglects internal heat sources (e.g., CPU load) and complex environmental gradients; a more comprehensive thermodynamic sub-model would reduce this discrepancy. \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{-0.5cm}
+\bibliographystyle{apacite}
+\bibliography{references}
+% 以下为信件/备忘录部分，不需要可自行去掉
+% 如有需要可将整个 letter 环境移动到文章开头或中间
+% 请在后一个花括号内填写信件（Letter）或备忘录（Memorandum）标题
+
+
+
+\begin{subappendices}  % 附录环境
+	
+\section{Report on Use of AI Tools}
+1.Query: OpenAI ChatGpt(February 1, 2026 version,ChatGPT-4o)	
+Query:What factors do you think influence how quickly a smartphone's battery drains?
+\textbf{Output:}Factors affecting rapid battery drain in smartphones can generally be categorized into: screen and usage patterns, network and signal strength, background processes and system settings, hardware and battery health, and environmental conditions and charging habits. Below is a list ranked by "most common and most impactful":
+
+(1) Screen-related (typically the top power drain)
+
+Screen brightness: Higher brightness consumes more power; auto-brightness may sometimes set brightness too high.
+
+Screen-on time: Longer screen-off periods and extended screen viewing consume more power.
+
+Refresh rate/resolution: 120Hz, 2K, etc., consume more power; some models show more noticeable drain with "high refresh rate + high resolution" enabled.
+
+Always-On Display (AOD): Though individual instances are minor, cumulative usage over time adds up significantly.
+
+(2) Network & Signal (Signal loss causes rapid battery drain)
+
+Cellular Signal Strength: In areas with poor reception like subways, basements, or rural areas, phones repeatedly search for networks or boost transmission power, causing battery drain to spike.
+
+5G vs 4G: 5G consumes more power, especially when signals are unstable or frequently switch.
+
+Hotspot/Bluetooth/Wi-Fi Scanning: Hotspot usage is highly power-intensive; Bluetooth itself isn't major, but connecting to multiple devices or frequent scanning increases consumption.
+
+Location Services (GPS): Navigation, fitness tracking, ride-hailing, and similar scenarios continuously elevate power consumption.
+
+(3) Apps & Background Activity ("Invisible Power Drain")
+
+Frequent Background Refresh/Push Notifications: Social media, short video, and news apps may frequently wake the device.
+
+High-Power App Behaviors: Continuous location tracking, background recording, background downloads/uploads, frequent CPU wake-ups.
+
+Sync Services: Photo cloud syncing, cloud storage, email syncing, heavy IM message exchanges.
+
+Advertising/Abnormal SDKs or "Rogue Background Processes": Some apps abnormally consume network resources or wake the system.
+
+(4) Usage Scenarios (What You're Doing)
+
+Gaming/AR/High-Frame-Rate Video: Prolonged GPU/CPU heavy loads are major power drains.
+
+Photo/Video Capture: Especially 4K/60fps, extended recording, or when using stabilization/algorithm enhancements.
+
+Video Conferencing/Live Streaming: Quadruple load from screen + camera + encoding + network.
+
+High-Volume Speakerplay: Higher volume means greater power consumption by the amplifier.
+
+(5) System Settings and State
+
+Short-Term Power Drain After Updates: Post-update processes like indexing, cache rebuilding, and photo analysis may cause slightly higher power consumption for 1-2 days.
+
+Power Saving Mode Status: Disabling power saving or using Performance/High-Performance modes consumes more power.
+
+Excessive Notifications: Frequent screen wake-ups, vibrations, and notification lights accumulate over time.
+
+(6) Battery Health and Hardware Factors ("Same usage but faster drain")
+
+Battery aging (capacity decline, increased internal resistance): Reduced capacity and greater voltage drop under high load manifest as "sudden rapid drain/auto shutdown."
+
+Thermal management: Poor heat dissipation causes SoC to throttle/overheat more easily, worsening overall energy efficiency.
+
+Accessory Factors: Low-quality cables/chargers reduce charging efficiency and generate excessive heat (indirectly affecting the battery).
+
+(7) Ambient Temperature
+
+Low Temperatures: Lithium batteries experience significant capacity reduction in cold conditions, making battery drain "appear faster."
+
+High Temperatures: Accelerates battery aging, may trigger system performance/charging throttling, and feels more power-hungry.
+
+To quickly pinpoint "what's draining your phone's battery"
+
+Follow this troubleshooting sequence:
+
+Check system battery usage stats (by app/system component)
+
+Compare: Does battery drain worsen noticeably in areas with poor signal?
+
+Check: Are any apps showing abnormal background location tracking/activity duration?
+
+Review battery health (iPhone Battery Health/some Android brands offer battery health or "battery capacity" estimates)
+
+If you're willing, send me the following details (screenshots not required) for a more precise diagnosis:
+
+Device model + OS version
+
+Your daily usage patterns (e.g., gaming/video streaming/navigation/video calls)
+
+Top 5 battery consumers in usage stats (with approximate percentages)
+
+Battery health percentage (if visible)
+
+1.Query: OpenAI ChatGpt(February 1, 2026 version,ChatGPT-4o)	
+Query:WWhat is the core difference between Monte Carlo simulation and traditional numerical calculation methods?
+\textbf{Output:}Errors in Monte Carlo (MC) simulations primarily stem from **random estimation** and uncertainties arising from **model/implementation details**. These can be categorized into five major sources, each with corresponding reliability assessment methods.
+
+---
+
+\textbf{ I. What are the sources of error?}
+
+(1) Statistical sampling error — The most fundamental and common
+- Since only a finite number of samples \(N\) are drawn, the estimate itself is a random variable.
+- For the typical scenario of "estimating the expected value of a sample mean":
+\[
+\text{Standard error} \approx \frac{\sigma}{\sqrt{N}}
+\]
+  where \(\sigma\) is the true standard deviation of the target random variable (typically estimated using the sample variance).
+- Characteristic: \textbf{The larger \(N\), the smaller the error, but improvement is only \(1/\sqrt{N}\)}.
+
+
+(2) Variance / rare-event problem (due to excessive variance or rare events)
+- Not necessarily "biased," but leads to large standard errors: Requires a large sample size for stability.
+- Common triggers: Tail probabilities, default/failure probabilities, extreme losses, etc. (events with very low occurrence probabilities).
+- Manifestation: Results fluctuate wildly, with significant differences between different random seeds.
+
+(3) Bias Error — Estimators are inherently biased
+Common causes:
+\textbf{Discretization/time step} (SDE/stochastic process path simulation): Systemic bias from overly large \(\Delta t\).
+\textbf{Truncation/approximation}: Truncation of infinite interval integrals, tail clipping of distributions, simplified models.
+\textbf{Biased algorithm implementation}: e.g., incorrect acceptance-rejection, weight normalization errors, miswritten sampling distributions.
+\textbf{Bias from nonlinear processing}: Mistaking \(E[g(X)]\) as an approximation of \(g(E[X])\) introduces bias (Jensen's inequality).
+
+ (4) Random Number & Dependence Errors (RNG / dependence)
+- Poor-quality pseudorandom numbers (short periods, high dimensional dependence) cause biased results or abnormal variance.
+- More pronounced in MCMC: \textbf{sample autocorrelation} leads to "large nominal N but small effective sample size (ESS)".
+
+### 5) Numerical Implementation Errors (Floating Point / Bugs / Edge Cases)
+- Floating-point errors are rarely primary causes but amplify in tail probabilities, exponentiation overflows, or when differences cancel.
+- Code bugs, boundary conditions, unit conversions, and poor random seed management are common sources of "hidden bias" in engineering.
+
+---
+
+## II. How to Evaluate the Reliability of Simulation Results?
+
+### 1) Report "Point Estimate + Uncertainty"
+For the mean of independent and identically distributed (i.i.d.) samples:
+- Estimate:
+  \[
+  \hat{\mu} = \frac{1}{N} \sum_{i=1}^N X_i
+\]
+- Sample variance:
+\[
+  s^2=\frac{1}{N-1}\sum_{i=1}^N (X_i-\hat\mu)^2
+\]
+- Standard error (SE):
+\[
+  \text{SE}=\frac{s}{\sqrt{N}}
+\]
+- 95% Confidence Interval (commonly used when N is large):
+\[
+\hat{\mu} \pm 1.96 \cdot \text{SE}
+\]
+
+> Common metric: Relative Standard Error **RSE = SE / |\hat{\mu}|** (e.g., <1% or <5% depending on context).
+
+---
+
+### 2) Repeat runs (with different random seeds) to assess stability
+- Run \(K\) times with different seeds, comparing means/variances/maximum differences.
+- If differences across seeds are **significantly larger** than your reported CI:
+  - Samples may not be independent (MCMC)
+  - Or variance is too high, N is insufficient
+  - Or issues with implementation/model.
+
+---
+
+### 3) Convergence Diagnosis: Observe estimates as N changes
+- Monitor \(\hat\mu(N)\)'s trajectory with N and whether rolling CI width decreases as \(1/\sqrt{N}\).
+- If persistent drift occurs: more indicative of a **bias issue** (e.g., discretization errors, insufficient burn-in, unstable model).
+
+---
+
+### 4) Bias assessment: Perform step-size/truncation sensitivity analysis (critical)
+If discretization parameters exist (e.g., \(\Delta t\), grid h, truncation upper bound T):
+- Repeat simulations with multiple parameter sets (e.g., \(\Delta t\), \(\Delta t/2\), \(\Delta t/4\)).
+- Reliability criterion: **Results after step size reduction show changes smaller than statistical error magnitude**; otherwise, bias dominates error.
+
+---
+
+### 5) Correlation Assessment (Mandatory for MCMC/Correlated Sampling)
+- Examine autocorrelation and compute **Effective Sample Size (ESS)**:
+  - Low ESS ⇒ Actual information far less than N ⇒ CI cannot be calculated simply as \(1/\sqrt{N}\).
+- Perform multi-chain diagnostics (e.g., Gelman–Rubin \(\hat R\)):
+  - If multiple chains originating from different initial conditions converge to the same distribution, credibility increases.
+
+---
+
+### 6) Verification Against Validatable Benchmarks (Sanity Checks)
+- First validate MC reproducibility using analytically/semi-analytically solvable special cases.
+- Perform conservation/constraint checks: verify probability normalization, boundary condition satisfaction, physical quantity conservation, etc.
+- For low dimensions, cross-validate using traditional numerical methods (Gaussian quadrature/finite differences).
+
+---
+
+## III. A Practical "Credibility Checklist" (Ready-to-Copy for Reports)
+1. Report \(\hat\mu\), SE, 95% CI, RSE  
+2. Report sample size N, random seed strategy, and whether i.i.d.  
+3. Convergence: Is \(\hat\mu(N)\) stable? Does the CI shrink?  
+4. Reproducibility: Differences across seeds fall within CI  
+5. Bias: Passes step-size/truncation sensitivity tests  
+6. If MCMC: ESS, \(\hat R\), autocorrelation, and burn-in explanation  
+7. Benchmark/control: Passes sanity checks
+
+
+\end{subappendices}
+
+% 以下为附录内容
+% 如您的论文中不需要附录，请自行删除
+\end{document} 
